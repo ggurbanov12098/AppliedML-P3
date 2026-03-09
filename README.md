@@ -7,6 +7,7 @@
 [![Dataset](https://img.shields.io/badge/Dataset-UCI%20Auto%20MPG-blue)](https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/)
 [![Python](https://img.shields.io/badge/Python-3.10+-yellow)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-Interactive%20Dashboard-red)](https://streamlit.io)
+[![Report](https://img.shields.io/badge/Paper-IEEE%20Format-brightgreen)](https://www.overleaf.com/read/dffnwqycxjsp#fb87cb)
 
 This project applies **resampling** and **model selection** techniques to predict vehicle fuel efficiency (MPG) from engineering specifications using the [UCI Auto MPG dataset](https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/). We systematically compare **cross-validation**, **bootstrap**, **subset selection**, **Ridge/Lasso regularization**, **PCA**, and **PLS** — identifying the best-performing model and visualizing the bias–variance tradeoff at each step.
 
