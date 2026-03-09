@@ -1,401 +1,305 @@
-# Applied Machine Learning - Course Project 3: Resampling and Model Selection Methods
+# Resampling & Model Selection for Fuel Efficiency Prediction
 
-## Complete Project Documentation
+> **Applied Machine Learning — Course Project 3**  
+> Riyad Abdurahimov · Gabil Gurbanov  
+> Instructor: Dr. Samir Rustamov
 
-**Purpose:** This document provides a comprehensive overview of the AML-P3 project for use in drafting the IEEE-format report (Overleaf) and the 5-minute presentation.
+[![Dataset](https://img.shields.io/badge/Dataset-UCI%20Auto%20MPG-blue)](https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/)
+[![Python](https://img.shields.io/badge/Python-3.10+-yellow)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Interactive%20Dashboard-red)](https://streamlit.io)
 
----
-
-## 1. Executive Summary
-
-| Item | Details |
-|------|---------|
-| **Project Title** | Course Project 3 — Resampling and Model Selection Methods |
-| **Dataset** | UCI Auto MPG (Machine Learning Repository) |
-| **Task** | Regression: Predict fuel efficiency (mpg) from car specifications |
-| **Team Members** | Riyad Abdurrahmanov, Gabil Gurbanov |
-| **Instructor** | Dr. Samir Rustamov |
-
-**Key Findings:**
-
-- **Resampling:** Best polynomial degree = 2 for all methods (K=5, K=10, LOOCV, Bootstrap)
-- **Subset Selection:** Optimal 4 features (displacement, weight, model_year, origin) by cross-validation
-- **Shrinkage:** Optimal λ ≈ 0.001 for both Ridge and Lasso
-- **Best Model:** OLS with best 4-subset (CV RMSE 3.369, R² 0.8113)
-- **PCA:** First principal component explains ~65.9% of variance; first 3 PCs exceed 95%
-- **PLS vs PCR:** PLS reaches full OLS performance with fewer components than PCR
+This project applies **resampling** and **model selection** techniques to predict vehicle fuel efficiency (MPG) from engineering specifications using the [UCI Auto MPG dataset](https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/). We systematically compare **cross-validation**, **bootstrap**, **subset selection**, **Ridge/Lasso regularization**, **PCA**, and **PLS** — identifying the best-performing model and visualizing the bias–variance tradeoff at each step.
 
 ---
 
-## 2. Motivation and Problem Setting
+## Key Results
 
-### 2.1 Problem
-
-Predict miles per gallon (mpg) — a measure of fuel efficiency — from vehicle specifications. This is a classic regression problem in applied machine learning.
-
-### 2.2 Dataset
-
-- **Source:** UCI Machine Learning Repository (Auto MPG)
-- **Original size:** 398 rows, 9 columns
-- **After preprocessing:** 392 rows, 8 columns (6 rows dropped due to missing `horsepower`)
-
-### 2.3 Features and Target
-
-| Feature | Description |
-|---------|-------------|
-| cylinders | Number of cylinders |
-| displacement | Engine displacement (cubic inches) |
-| horsepower | Engine horsepower |
-| weight | Vehicle weight (lbs) |
-| acceleration | Time to accelerate 0–60 mph (seconds) |
-| model_year | Model year (mod 100, e.g., 70–82) |
-| origin | Origin (1=USA, 2=Europe, 3=Japan) |
-| **mpg** | **Target:** Miles per gallon |
-
-### 2.4 Preprocessing
-
-- Dropped rows with missing `horsepower` (6 rows)
-- Dropped `car_name` column (non-numeric)
-- Standardized all features using `StandardScaler` for model selection and shrinkage methods
+| Method | Best Configuration | Performance |
+|---|---|---|
+| **Resampling** | Polynomial degree 2 on weight | MSE = 17.52 (all CV methods agree) |
+| **Subset Selection** | 4 features: displacement, weight, model_year, origin | CV MSE = 11.35 |
+| **Shrinkage** | λ = 0.001 (Ridge & Lasso) | Coefficients ≈ OLS |
+| **PCA/PLS** | PLS reaches OLS with fewer components than PCR | MSE ≈ 11.45 at 6 comp |
+| **🏆 Best Model** | **OLS with 4-feature subset** | **RMSE = 3.369, R² = 0.8113** |
 
 ---
 
-## 3. Part 1: Resampling Methods (40%)
+## Table of Contents
 
-### 3.1 Methodology
-
-**Polynomial Regression Setup:**
-
-- Single feature: **weight** (highest correlation with mpg)
-- Pipeline: `PolynomialFeatures` → `StandardScaler` → `LinearRegression`
-- Polynomial degrees evaluated: 1 through 8
-
-**Cross-Validation:**
-
-- **K=5:** 5-fold CV, shuffled, random_state=42
-- **K=10:** 10-fold CV, shuffled, random_state=42
-- **LOOCV:** Leave-One-Out (K = n = 392)
-
-**Bootstrap:**
-
-- B = 200 bootstrap samples
-- Each sample: draw n observations with replacement
-- Evaluation: out-of-bag (OOB) samples as test set
-
-### 3.2 Results
-
-**Cross-Validation MSE by Degree:**
-
-| Degree | K=5 CV MSE | K=10 CV MSE | LOOCV MSE |
-|--------|------------|-------------|-----------|
-| 1 | 18.927 | 18.840 | 18.852 |
-| 2 | **17.574** | **17.519** | **17.525** |
-| 3 | 17.610 | 17.574 | 17.578 |
-| 4 | 17.626 | 17.602 | 17.623 |
-| 5 | 17.691 | 17.609 | 17.628 |
-| 6 | 17.772 | 17.724 | 17.694 |
-| 7 | 17.771 | 17.746 | 17.667 |
-| 8 | 17.757 | 17.805 | 17.765 |
-
-**Best degree:** 2 for all three CV methods.
-
-**Bootstrap MSE by Degree:**
-
-| Degree | Bootstrap MSE | Bootstrap Std |
-|--------|---------------|---------------|
-| 1 | 18.751 | 2.091 |
-| 2 | **17.449** | 2.131 |
-| 3 | 17.526 | 2.137 |
-| 4 | 17.604 | 2.139 |
-| 5 | 17.650 | 2.152 |
-| 6 | 17.775 | 2.100 |
-| 7 | 17.777 | 2.122 |
-| 8 | 18.004 | 2.240 |
-
-**Best degree (Bootstrap):** 2 (MSE = 17.45 ± 2.13)
-
-### 3.3 Plots
-
-| File | Description |
-|------|-------------|
-| `cv_mse_polynomial.png` | CV MSE vs polynomial degree for K=5, K=10, LOOCV; shows best degree = 2 |
-| `resampling_comparison.png` | Left: all CV methods; Right: Bootstrap MSE with error bars (±1 std) |
+- [Quick Start](#quick-start)
+- [Project Overview](#project-overview)
+- [Dataset](#dataset)
+- [Methodology & Results](#methodology--results)
+  - [Resampling Methods](#1-resampling-methods)
+  - [Subset Selection](#2-subset-selection)
+  - [Shrinkage Methods](#3-shrinkage-methods-ridge--lasso)
+  - [PCA & PLS](#4-pca--pls)
+  - [Model Comparison](#5-final-model-comparison)
+- [Interactive Dashboard](#interactive-dashboard)
+- [Project Structure](#project-structure)
+- [Visualizations](#visualizations)
+- [References](#references)
 
 ---
 
-## 4. Part 2: Model Selection (40%)
+## Quick Start
 
-### 4.1 Subset Selection
+```bash
+# Clone the repository
+git clone https://github.com/ggurbanov12098/AppliedML-P3.git
+cd AppliedML-P3
 
-**Methods:**
+# Install dependencies (scikit-learn, statsmodels, pandas, streamlit, matplotlib)
+pip install scikit-learn statsmodels pandas streamlit matplotlib seaborn
 
-- **Best Subset:** Exhaustive search over all subsets of size k for k = 1, …, 7
-- **Forward Stepwise:** Add one feature at a time by AIC
-- **Backward Stepwise:** Remove one feature at a time by AIC
+# Launch the interactive dashboard
+streamlit run streamlit_app.py
 
-**Model Selection Criteria:**
-
-- Mallow's Cp (minimize)
-- AIC (minimize)
-- BIC (minimize)
-- Adjusted R² (maximize)
-- 10-fold CV MSE (minimize)
-
-**Best Subset by Number of Predictors (k):**
-
-| k | AIC | BIC | Cp | Adj R² | CV MSE | Selected Features |
-|---|-----|-----|-----|--------|--------|-------------------|
-| 1 | 2263.9 | 2271.9 | 18.73 | 0.692 | 18.84 | weight |
-| 2 | 2081.1 | 2093.0 | 11.77 | 0.807 | 11.81 | weight, model_year |
-| 3 | 2063.7 | 2079.6 | 11.26 | 0.816 | 11.38 | weight, model_year, origin |
-| 4 | 2064.3 | 2084.2 | 11.28 | 0.816 | **11.35** | displacement, weight, model_year, origin |
-| 5 | 2062.1 | 2086.0 | 11.22 | 0.818 | 11.40 | displacement, horsepower, weight, model_year, origin |
-| 6 | 2061.6 | 2089.4 | 11.21 | 0.818 | 11.37 | cylinders, displacement, horsepower, weight, model_year, origin |
-| 7 | 2062.9 | 2094.7 | 11.24 | 0.818 | 11.45 | all features |
-
-**Optimal by CV:** k = 4 predictors — displacement, weight, model_year, origin (CV MSE = 11.353)
-
-**Plots:**
-
-- `subset_selection.png`: AIC, BIC, Cp, Adjusted R² vs number of predictors (Best Subset, Forward, Backward)
-- `subset_cv.png`: 10-fold CV MSE vs number of predictors with optimal k highlighted
-
-### 4.2 Shrinkage Methods (Ridge and Lasso)
-
-**Formulation:**
-
-- **Ridge (L2):** Minimize RSS + λΣβ² — shrinks all coefficients toward zero, none exactly zero
-- **Lasso (L1):** Minimize RSS + λΣ|β| — can produce sparse solutions (exact zeros)
-
-**Optimal λ Selection:** 10-fold cross-validation via `RidgeCV` and `LassoCV`
-
-**Results:**
-
-- **Optimal Ridge λ:** 0.001
-- **Optimal Lasso λ:** 0.001
-
-**Coefficients at Optimal λ:**
-
-| Feature | OLS | Ridge | Lasso |
-|---------|-----|-------|-------|
-| cylinders | -0.8405 | -0.8405 | -0.8194 |
-| displacement | 2.0793 | 2.0791 | 2.0335 |
-| horsepower | -0.6516 | -0.6517 | -0.6439 |
-| weight | -5.4921 | -5.4919 | -5.4783 |
-| acceleration | 0.2220 | 0.2220 | 0.2192 |
-| model_year | 2.7621 | 2.7621 | 2.7606 |
-| origin | 1.1473 | 1.1473 | 1.1426 |
-
-**Plots:**
-
-- `shrinkage_coef_paths.png`: Ridge and Lasso coefficient paths vs λ (log scale)
-- `bias_variance_tradeoff.png`: Train MSE vs Test MSE vs λ for Ridge and Lasso; shows bias-variance tradeoff
-- `coefficient_comparison.png`: Bar chart comparing OLS, Ridge, Lasso coefficients at optimal λ
-
-### 4.3 Principal Component Analysis (PCA) and Partial Least Squares (PLS)
-
-**PCA Variance Explained:**
-
-| Component | Variance Explained | Cumulative |
-|-----------|-------------------|------------|
-| PC1 | 65.89% | 65.89% |
-| PC2 | 13.43% | 79.32% |
-| PC3 | 10.63% | 89.95% |
-| PC4 | 6.88% | 96.83% |
-| PC5 | 1.85% | 98.68% |
-| PC6 | 0.85% | 99.52% |
-| PC7 | 0.48% | 100% |
-
-**First 3 PCs explain >95% of variance.**
-
-**PCR vs PLS: MSE vs Number of Components (10-fold CV):**
-
-| # Components | PCR MSE | PLS MSE |
-|--------------|---------|---------|
-| 1 | 16.988 | 15.728 |
-| 2 | 16.942 | 12.818 |
-| 3 | 13.247 | 12.109 |
-| 4 | 13.164 | 11.720 |
-| 5 | 12.655 | 11.630 |
-| 6 | 11.796 | 11.456 |
-| 7 | 11.452 | 11.452 |
-
-**Interpretation:** PLS reaches OLS-level performance (MSE ≈ 11.45) with fewer components than PCR because PLS is supervised (uses both X and y) while PCR is unsupervised (uses only X).
-
-**Plots:**
-
-- `pca_variance.png`: Bar chart of variance explained per component; line chart of cumulative variance
-- `pcr_pls_comparison.png`: PCR and PLS MSE vs number of components, with OLS baseline
-- `pca_biplot.png`: PC1 vs PC2 scatter colored by MPG, with feature loading arrows
-
----
-
-## 5. Part 3: Model Comparison
-
-### 5.1 Final Model Summary (10-fold CV)
-
-| Model | CV MSE | CV RMSE | CV R² |
-|-------|--------|---------|-------|
-| OLS (all features) | 11.452 | 3.384 | 0.8085 |
-| **OLS (best 4 subset)** | **11.353** | **3.369** | **0.8113** |
-| Ridge (optimal λ) | 11.452 | 3.384 | 0.8085 |
-| Lasso (optimal λ) | 11.451 | 3.384 | 0.8085 |
-| PCR (7 comp) | 11.452 | 3.384 | 0.8085 |
-| PLS (7 comp) | 11.452 | 3.384 | 0.8085 |
-
-**Best Model:** OLS with best 4-subset (displacement, weight, model_year, origin) — slightly lower RMSE (3.369) and higher R² (0.8113) than full OLS and regularized/dimension-reduced models.
-
-**Plot:** `model_comparison.png` — horizontal bar charts of CV RMSE and CV R² for all six models.
-
----
-
-## 6. Streamlit UI (Extra Task — 20%)
-
-### 6.1 Overview
-
-A clean, user-friendly Streamlit application provides interactive exploration of all methods and results.
-
-**Run command:** `streamlit run streamlit_app.py`
-
-### 6.2 Pages
-
-| Page | Description |
-|------|-------------|
-| **Overview & EDA** | Dataset preview, feature distributions, correlation heatmap, scatter plots (feature vs MPG) |
-| **Resampling Methods** | Select feature, max degree, B; run K=5, K=10, LOOCV, Bootstrap; MSE vs degree plots; detailed MSE table |
-| **Subset Selection** | Run best/forward/backward; AIC, BIC, Cp, Adj R² vs k; CV MSE vs k; optimal feature list |
-| **Shrinkage (Ridge/Lasso)** | Test size, λ range; coefficient paths; bias-variance tradeoff; OLS vs Ridge vs Lasso coefficient comparison |
-| **PCA & PLS** | Variance explained; PCR vs PLS vs OLS MSE; PCA biplot (PC1 vs PC2, colored by MPG) |
-| **Model Comparison** | Run all 6 models; RMSE and R² bar charts; best model; actual vs predicted scatter |
-| **Live Prediction Lab** | Car specs input (presets: 70s V8, 80s economy, etc.); choose algorithm; predict MPG; feature contributions; compare across models |
-
-### 6.3 Design
-
-- Dark theme (background #0f1117, cards #1a2035)
-- Metric cards for key numbers
-- Section headers with gradient styling
-- Interactive parameters (sliders, selectors, buttons)
-- Data loaded from UCI URL with synthetic fallback if offline
-
----
-
-## 7. File Inventory
-
-### 7.1 Project Files
-
-| File | Description |
-|------|-------------|
-| `project3_autompg.ipynb` | Main Jupyter notebook: data loading, preprocessing, resampling, model selection, PCA/PLS, model comparison |
-| `streamlit_app.py` | Streamlit interactive UI (7 pages) |
-| `instructions.md` | Assignment instructions |
-| `auto-mpg.csv` | Raw UCI Auto MPG data |
-| `auto_mpg_clean.csv` | Cleaned dataset (392 rows, no car_name) |
-| `results.json` | Saved numerical results (CV MSE, bootstrap, subset metrics, optimal λ, PCA, model summary) |
-| `submission.csv` | Submission file (ID, LABEL columns) |
-
-### 7.2 Output Plots (14 PNG files)
-
-| File | Content |
-|------|---------|
-| `scatter_plots.png` | Feature vs MPG scatter plots |
-| `correlation_heatmap.png` | Feature correlation matrix |
-| `cv_mse_polynomial.png` | CV MSE vs polynomial degree |
-| `resampling_comparison.png` | CV vs Bootstrap MSE comparison |
-| `subset_selection.png` | AIC, BIC, Cp, Adj R² vs # predictors |
-| `subset_cv.png` | CV error vs # predictors |
-| `shrinkage_coef_paths.png` | Ridge/Lasso coefficient paths |
-| `bias_variance_tradeoff.png` | Train/test MSE vs λ |
-| `coefficient_comparison.png` | OLS vs Ridge vs Lasso coefficients |
-| `pca_variance.png` | PCA variance explained |
-| `pcr_pls_comparison.png` | PCR vs PLS vs OLS MSE |
-| `pca_biplot.png` | PCA biplot (PC1 vs PC2) |
-| `model_comparison.png` | Final model RMSE and R² |
-
----
-
-## 8. Report and Presentation Mapping
-
-### 8.1 IEEE Report Structure (5 pages max)
-
-| Section | Content |
-|---------|---------|
-| **Abstract** | Problem, methods, key results (best degree 2, best 4-subset, RMSE 3.369) |
-| **I. Introduction / Motivation** | Predict MPG from car specs; UCI Auto MPG; 392 samples, 7 features |
-| **II. Method** | Resampling (CV, Bootstrap), subset selection (Cp, AIC, BIC, Adj R², CV), shrinkage (Ridge, Lasso), PCA, PLS |
-| **III. Experiments** | Setup (degrees 1–8, B=200, K=5/10/LOOCV); tables of MSE, subset metrics, model comparison |
-| **IV. Results and Discussion** | Best degree 2; optimal 4 features; λ≈0.001; OLS best 4 slightly best; PLS vs PCR |
-| **V. Conclusion** | Summary; contributions; possible extensions |
-| **Appendix** | Figures (plots); team members' contributions |
-
-### 8.2 Suggested Presentation Slides (5 min + 5 min Q&A)
-
-| Slide | Content |
-|-------|---------|
-| 1 | Title, team (Riyad Abdurrahmanov, Gabil Gurbanov), instructor (Dr. Samir Rustamov), dataset |
-| 2 | Problem: predict MPG; dataset overview |
-| 3 | Resampling: CV (K=5,10,LOOCV) + Bootstrap; best degree = 2; show `resampling_comparison.png` |
-| 4 | Subset selection: Cp, AIC, BIC, CV; optimal 4 features; show `subset_cv.png` |
-| 5 | Shrinkage: Ridge/Lasso; optimal λ; show `bias_variance_tradeoff.png` |
-| 6 | PCA/PLS: variance explained; PCR vs PLS; show `pcr_pls_comparison.png` |
-| 7 | Model comparison: best = OLS best 4; show `model_comparison.png` |
-| 8 | Streamlit UI demo (screenshot or live) |
-| 9 | Conclusion and Q&A |
-
-### 8.3 Key Figures to Include in Report
-
-1. `resampling_comparison.png` — Resampling methods
-2. `subset_selection.png` or `subset_cv.png` — Subset selection
-3. `bias_variance_tradeoff.png` — Shrinkage
-4. `pcr_pls_comparison.png` — PCA/PLS
-5. `model_comparison.png` — Final comparison
-
----
-
-## Appendix: Workflow Diagram
-
-```mermaid
-flowchart TB
-    subgraph Data [Data]
-        Raw[Raw Auto MPG]
-        Clean[Clean Dataset]
-    end
-
-    subgraph Resampling [Resampling]
-        CV[K-Fold CV K=5,10,LOOCV]
-        Boot[Bootstrap B=200]
-        Poly[Polynomial on Weight]
-    end
-
-    subgraph ModelSelect [Model Selection]
-        Subset[Subset Selection]
-        Ridge[Ridge]
-        Lasso[Lasso]
-        PCA[PCA/PCR]
-        PLS[PLS]
-    end
-
-    subgraph Output [Output]
-        Compare[Model Comparison]
-        Best[Best: OLS 4-subset]
-    end
-
-    Raw --> Clean
-    Clean --> Poly
-    Poly --> CV
-    Poly --> Boot
-    Clean --> Subset
-    Clean --> Ridge
-    Clean --> Lasso
-    Clean --> PCA
-    Clean --> PLS
-    Subset --> Compare
-    Ridge --> Compare
-    Lasso --> Compare
-    PCA --> Compare
-    PLS --> Compare
-    Compare --> Best
+# Or explore the Jupyter notebook
+jupyter notebook AML-P3.ipynb
 ```
 
 ---
 
-*Document generated for Course Project 3 — Resampling and Model Selection Methods. Use this as the primary reference when writing the IEEE report and preparing the presentation.*
+## Project Overview
+
+Predicting fuel efficiency from vehicle specifications is a classic regression problem. The challenge lies in balancing model complexity against generalization:
+
+- **Too complex** → overfitting (high variance, low bias)
+- **Too simple** → underfitting (low variance, high bias)
+
+This project systematically evaluates techniques from **Chapter 5–6 of ISLR** to find the sweet spot:
+
+```mermaid
+flowchart TB
+    A["UCI Auto MPG (392 samples)"] --> B["Preprocessing: Clean + Scale"]
+    B --> C["Resampling: CV · Bootstrap"]
+    B --> D["Subset Selection: Best · Forward · Backward"]
+    B --> E["Shrinkage: Ridge · Lasso"]
+    B --> F["Dim. Reduction: PCA · PLS"]
+    C --> G["Model Comparison"]
+    D --> G
+    E --> G
+    F --> G
+    G --> H["🏆 Best: OLS 4-subset (RMSE=3.369)"]
+```
+
+---
+
+## Dataset
+
+**Source:** [UCI Machine Learning Repository — Auto MPG](https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/)
+
+| Property | Detail |
+|---|---|
+| Original size | 398 rows × 9 columns |
+| After cleaning | 392 rows × 8 columns |
+| Dropped | 6 rows (missing `horsepower`), `car_name` column |
+| Scaling | `StandardScaler` (zero mean, unit variance) |
+
+### Features
+
+| Feature | Description | Type |
+|---|---|---|
+| `cylinders` | Number of cylinders | Discrete |
+| `displacement` | Engine displacement (cu. in.) | Continuous |
+| `horsepower` | Engine horsepower | Continuous |
+| `weight` | Vehicle weight (lbs) | Continuous |
+| `acceleration` | Time to 0–60 mph (sec) | Continuous |
+| `model_year` | Model year (70–82) | Discrete |
+| `origin` | Origin: 1=USA, 2=Europe, 3=Japan | Categorical |
+| **`mpg`** | **Miles per gallon (Target)** | **Continuous** |
+
+**Weight** has the strongest negative correlation with MPG (−0.83), making it the primary feature for polynomial resampling experiments.
+
+---
+
+## Methodology & Results
+
+### 1. Resampling Methods
+
+We evaluate polynomial regression (degrees 1–8) on **weight** using four resampling strategies:
+
+- **K-Fold CV** (K=5, K=10) — shuffled, `random_state=42`
+- **LOOCV** — Leave-One-Out (K = n = 392)
+- **Bootstrap** — B=200 replications with OOB evaluation
+
+| Degree | K=5 MSE | K=10 MSE | LOOCV MSE | Bootstrap MSE |
+|:---:|:---:|:---:|:---:|:---:|
+| 1 | 18.93 | 18.84 | 18.85 | 18.75 ± 2.09 |
+| **2** | **17.57** | **17.52** | **17.52** | **17.45 ± 2.13** |
+| 3 | 17.61 | 17.57 | 17.58 | 17.53 ± 2.14 |
+| 4 | 17.63 | 17.60 | 17.62 | 17.60 ± 2.14 |
+| 5 | 17.69 | 17.61 | 17.63 | 17.65 ± 2.15 |
+| 6 | 17.77 | 17.72 | 17.69 | 17.78 ± 2.10 |
+| 7 | 17.77 | 17.75 | 17.67 | 17.78 ± 2.12 |
+| 8 | 17.76 | 17.81 | 17.76 | 18.00 ± 2.24 |
+
+> **Finding:** All four methods unanimously select **degree 2** as optimal. Higher degrees increase complexity without improving test error — a clear sign of overfitting.
+
+### 2. Subset Selection
+
+We evaluate all subsets of size *k* = 1…7 using five criteria: **Mallow's Cₚ**, **AIC**, **BIC**, **Adjusted R²**, and **10-fold CV MSE**.
+
+| k | AIC | BIC | Cₚ | Adj R² | CV MSE | Selected Features |
+|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| 1 | 2263.9 | 2271.9 | 18.73 | 0.692 | 18.84 | weight |
+| 2 | 2081.1 | 2093.0 | 11.77 | 0.807 | 11.81 | weight, model_year |
+| 3 | 2063.7 | 2079.6 | 11.26 | 0.816 | 11.38 | weight, model_year, origin |
+| **4** | 2064.3 | 2084.2 | 11.28 | 0.816 | **11.35** | **displacement, weight, model_year, origin** |
+| 5 | 2062.1 | 2086.0 | 11.22 | 0.818 | 11.40 | + horsepower |
+| 6 | 2061.6 | 2089.4 | 11.21 | 0.818 | 11.37 | + cylinders |
+| 7 | 2062.9 | 2094.7 | 11.24 | 0.818 | 11.45 | all features |
+
+> **Finding:** **k=4** minimizes CV MSE. The optimal subset — displacement, weight, model_year, origin — outperforms the full 7-feature model by removing redundant predictors (cylinders, horsepower, acceleration).
+
+### 3. Shrinkage Methods (Ridge & Lasso)
+
+Both methods use 10-fold CV (`RidgeCV`, `LassoCV`) to select the optimal regularization parameter.
+
+| | Ridge (L2) | Lasso (L1) |
+|---|:---:|:---:|
+| **Optimal λ** | 0.001 | 0.001 |
+| **Effect** | Shrinks all coefficients | Can zero out coefficients |
+| **Result** | Coefficients ≈ OLS | Slight shrinkage on cylinders, displacement |
+
+**Coefficients at optimal λ:**
+
+| Feature | OLS | Ridge | Lasso |
+|---|:---:|:---:|:---:|
+| cylinders | −0.84 | −0.84 | −0.82 |
+| displacement | 2.08 | 2.08 | 2.03 |
+| horsepower | −0.65 | −0.65 | −0.64 |
+| **weight** | **−5.49** | **−5.49** | **−5.48** |
+| acceleration | 0.22 | 0.22 | 0.22 |
+| model_year | 2.76 | 2.76 | 2.76 |
+| origin | 1.15 | 1.15 | 1.14 |
+
+> **Finding:** Very low λ = 0.001 means regularization adds minimal bias. Weight dominates with the largest (negative) coefficient, confirming its importance. The bias–variance tradeoff plots show test MSE increasing sharply at high λ.
+
+### 4. PCA & PLS
+
+| Components | PCR MSE | PLS MSE |
+|:---:|:---:|:---:|
+| 1 | 16.99 | 15.73 |
+| 2 | 16.94 | 12.82 |
+| 3 | 13.25 | 12.11 |
+| 4 | 13.16 | 11.72 |
+| 5 | 12.65 | 11.63 |
+| 6 | 11.80 | 11.46 |
+| 7 | 11.45 | 11.45 |
+
+**PCA variance explained:** PC1 = 65.9%, PC2 = 13.4%, PC3 = 10.6% → first 3 components capture ~**90%** of total variance; first 4 exceed **96%**.
+
+> **Finding:** PLS reaches OLS-level performance (MSE ≈ 11.45) with **fewer components** than PCR. This is because PLS is **supervised** — it considers the target variable when constructing latent components — while PCR relies only on feature variance.
+
+### 5. Final Model Comparison
+
+| Model | CV MSE | CV RMSE | CV R² |
+|---|:---:|:---:|:---:|
+| OLS (all 7 features) | 11.452 | 3.384 | 0.8085 |
+| **OLS (best 4 subset)** | **11.353** | **3.369** | **0.8113** |
+| Ridge (λ = 0.001) | 11.452 | 3.384 | 0.8085 |
+| Lasso (λ = 0.001) | 11.451 | 3.384 | 0.8085 |
+| PCR (7 components) | 11.452 | 3.384 | 0.8085 |
+| PLS (7 components) | 11.452 | 3.384 | 0.8085 |
+
+> **🏆 Winner: OLS with the 4-feature subset** achieves the lowest RMSE (3.369) and highest R² (0.8113). Removing cylinders, horsepower, and acceleration reduces noise without losing predictive power.
+
+---
+
+## Interactive Dashboard
+
+An interactive **Streamlit** application provides full exploration of every method and result.
+
+```bash
+streamlit run streamlit_app.py
+```
+
+### Pages
+
+| Page | What You Can Do |
+|---|---|
+| **📊 Overview & EDA** | Browse the dataset, distributions, correlation heatmap, feature scatter plots |
+| **🔄 Resampling Methods** | Configure polynomial degree, K, B; run CV and bootstrap; view MSE curves |
+| **🔍 Subset Selection** | Run best/forward/backward; compare AIC, BIC, Cₚ, Adj R²; find optimal features |
+| **📈 Shrinkage** | Tune λ range; view coefficient paths; bias–variance tradeoff; compare OLS vs Ridge vs Lasso |
+| **🧩 PCA & PLS** | Explore variance explained; PCR vs PLS vs OLS MSE; interactive biplot |
+| **🏆 Model Comparison** | All 6 models side-by-side with RMSE, R² bar charts; actual vs predicted scatter |
+| **🚗 Live Prediction Lab** | Pick car presets (70s V8, 80s economy, etc.) or enter custom specs; predict MPG; see feature contributions |
+
+---
+
+## Project Structure
+
+```
+AppliedML-P3/
+├── AML-P3.ipynb              # Main Jupyter notebook (analysis & experiments)
+├── streamlit_app.py           # Interactive Streamlit dashboard (7 pages)
+├── README.md                  # This file
+│
+├── data/
+│   ├── auto-mpg.csv           # Raw UCI dataset
+│   ├── auto_mpg_clean.csv     # Cleaned dataset (392 rows)
+│   ├── results.json           # Saved numerical results
+│   └── submission.csv         # Submission file
+│
+├── visualizations/            # All generated plots (13 PNG files)
+│   ├── correlation_heatmap.png
+│   ├── scatter_plots.png
+│   ├── cv_mse_polynomial.png
+│   ├── resampling_comparison.png
+│   ├── subset_selection.png
+│   ├── subset_cv.png
+│   ├── shrinkage_coef_paths.png
+│   ├── bias_variance_tradeoff.png
+│   ├── coefficient_comparison.png
+│   ├── pca_variance.png
+│   ├── pca_biplot.png
+│   ├── pcr_pls_comparison.png
+│   └── model_comparison.png
+│
+└── report-pptx/               # Deliverables
+    ├── report.tex             # IEEE conference paper (LaTeX)
+    ├── AML_P3_Report.pdf      # Compiled report
+    ├── presentation.pptx      # Presentation slides
+    └── figures/               # Figures used in the report
+```
+
+---
+
+## Visualizations
+
+All plots are saved in `visualizations/` and embedded in the report. Below is a summary:
+
+| Plot | Shows |
+|---|---|
+| `correlation_heatmap.png` | Feature correlation matrix — weight is most correlated with MPG |
+| `scatter_plots.png` | Each feature vs MPG scatter |
+| `cv_mse_polynomial.png` | CV MSE vs polynomial degree (K=5, K=10, LOOCV) |
+| `resampling_comparison.png` | CV methods + bootstrap MSE with error bars |
+| `subset_selection.png` | AIC, BIC, Cₚ, Adj R² vs number of predictors |
+| `subset_cv.png` | 10-fold CV MSE vs number of predictors |
+| `shrinkage_coef_paths.png` | Ridge & Lasso coefficient paths vs log(λ) |
+| `bias_variance_tradeoff.png` | Train MSE vs Test MSE vs λ |
+| `coefficient_comparison.png` | OLS vs Ridge vs Lasso coefficients at optimal λ |
+| `pca_variance.png` | Variance explained per component + cumulative |
+| `pca_biplot.png` | PC1 vs PC2 scatter colored by MPG with loading arrows |
+| `pcr_pls_comparison.png` | PCR vs PLS MSE vs # components with OLS baseline |
+| `model_comparison.png` | Final RMSE and R² for all 6 models |
+
+---
+
+## References
+
+1. D. Dua and C. Graff, "UCI Machine Learning Repository," 2019. [Link](https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/)
+2. G. James, D. Witten, T. Hastie, and R. Tibshirani, *An Introduction to Statistical Learning with Applications in R*, 2nd ed. Springer, 2021.
+3. T. Hastie, R. Tibshirani, and J. Friedman, *The Elements of Statistical Learning*, 2nd ed. Springer, 2009.
+4. F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," *J. Mach. Learn. Res.*, vol. 12, pp. 2825–2830, 2011.
+
+---
+
+<p align="center">
+  <b>Applied Machine Learning — Course Project 3</b><br>
+  Riyad Abdurahimov · Gabil Gurbanov · Instructor: Dr. Samir Rustamov
+</p>
